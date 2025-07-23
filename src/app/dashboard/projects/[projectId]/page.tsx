@@ -10,9 +10,9 @@ import Link from 'next/link';
 import Markdown from 'react-markdown'; // マークダウンを表示するためのライブラリ
 
 interface PageProps {
-  params: {
+  params: Promise<{
     projectId: string;
-  };
+  }>;
 }
 
 // AIからのレスポンスの型を定義
@@ -22,9 +22,10 @@ interface AIResponse {
   strategyHypotheses: string;
 }
 
-export default function ProjectDetailPage({ params }: PageProps) {
+export default async function ProjectDetailPage({ params }: PageProps) { // async キーワードを追加
   const { user } = useRequireAuth();
-  const { projectId } = params;
+  const resolvedParams = await params; // await でPromiseを解決
+  const { projectId } = resolvedParams; // 解決されたオブジェクトからprojectIdを取得
 
   const [project, setProject] = useState<{ name: string; productInfo?: string; aiResponse?: AIResponse } | null>(null);
   const [productInfo, setProductInfo] = useState('');

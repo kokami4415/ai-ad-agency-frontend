@@ -1,8 +1,8 @@
-// src/components/ProjectPageWrapper.tsx
+// src/components/ProjectPageWrapper.tsx (最終確定版)
 "use client"; // クライアントコンポーネントであることを明示
 
 import { useEffect, useState, FormEvent, ReactNode } from 'react';
-import { useRequireAuth } from '@/contexts/AuthContext';
+import { useRequireAuth } from '@/contexts/AuthContext'; // クライアントコンポーネントなのでここでフックを呼ぶ
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { db, functions } from '@/lib/firebase';
@@ -18,30 +18,28 @@ interface AIResponse {
 
 interface ProjectPageWrapperProps {
   projectId: string;
-  projectName: string;
+  // projectName: string; // page.tsxから渡されたものは初期値として使い、実際の取得はWrapper内で行う
 }
 
-export default function ProjectPageWrapper({ projectId, projectName }: ProjectPageWrapperProps) {
-  // useRequireAuthはクライアントコンポーネントのトップレベルで呼び出す
-  const { user } = useRequireAuth();
-
-  const [project, setProject] = useState<{ name: string; productInfo?: string; aiResponse?: AIResponse } | null>(null);
+export default function ProjectPageWrapper({ projectId }: ProjectPageWrapperProps) {
+  const { user, loading: authLoading } = useRequireAuth(); // ユーザー認証状態を取得
+  const [projectName, setProjectName] = useState('読み込み中...'); // Wrapper内でprojectNameを管理
   const [productInfo, setProductInfo] = useState('');
   const [aiResponse, setAiResponse] = useState<AIResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [aiLoading, setAiLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // 初期ロード状態
+  const [aiLoading, setAiLoading] = useState(false); // AI分析中状態
   const [error, setError] = useState('');
 
-  // 初回ロード時にプロジェクトのデータを取得
+  // プロジェクトのデータとプロジェクト名をここで取得
   useEffect(() => {
-    if (user) {
+    if (!authLoading && user) { // 認証ロードが完了し、ユーザーが存在する場合
       const getProjectData = async () => {
         setLoading(true);
         const projectDocRef = doc(db, "users", user.uid, "projects", projectId);
         const docSnap = await getDoc(projectDocRef);
         if (docSnap.exists()) {
           const data = docSnap.data();
-          setProject({ name: data.name, productInfo: data.productInfo, aiResponse: data.aiResponse });
+          setProjectName(data.name); // プロジェクト名を更新
           setProductInfo(data.productInfo || '');
           setAiResponse(data.aiResponse || null);
         } else {
@@ -50,8 +48,11 @@ export default function ProjectPageWrapper({ projectId, projectName }: ProjectPa
         setLoading(false);
       };
       getProjectData();
+    } else if (!authLoading && !user) {
+      // 認証ロードが完了したがユーザーがいない場合 (useRequireAuthがリダイレクトするはず)
+      setLoading(false);
     }
-  }, [user, projectId]);
+  }, [authLoading, user, projectId]);
 
   // 「分析を開始する」ボタンが押された時の処理
   const handleAnalyze = async (e: FormEvent) => {
@@ -67,7 +68,7 @@ export default function ProjectPageWrapper({ projectId, projectName }: ProjectPa
 
     try {
       // Firebase Functionsの 'analyzeProduct' 関数を呼び出す準備
-      const analyzeProductFunc = httpsCallable(functions, 'analyzeProduct'); // <-- 関数名を修正
+      const analyzeProductFunc = httpsCallable(functions, 'analyzeProduct'); // <-- 関数名を修正なし
       // 関数にデータを渡して実行
       const result = await analyzeProductFunc({ productInfo });
       const data = result.data as AIResponse;
@@ -90,11 +91,17 @@ export default function ProjectPageWrapper({ projectId, projectName }: ProjectPa
     }
   };
   
-  if (loading) {
-    return <div className="flex items-center justify-center min-h-screen"><p>プロジェクトを読み込み中...</p></div>;
+  if (authLoading || loading) { // 認証ロード中またはプロジェクトデータロード中
+    return <div className="flex items-center justify-center min-h-screen"><p>読み込み中...</p></div>;
   }
   
-  if (error && !project) {
+  // ユーザーがいない場合、useRequireAuthがリダイレクトするので、ここでは表示しない
+  if (!user) {
+    return null;
+  }
+
+  // プロジェクトが見つからないエラー
+  if (error && !projectName) { // projectStateがnullではなくprojectNameが設定されていない場合
     return <div className="flex items-center justify-center min-h-screen"><p>{error}</p></div>;
   }
 
@@ -104,7 +111,7 @@ export default function ProjectPageWrapper({ projectId, projectName }: ProjectPa
         <div className="max-w-4xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
           <Link href="/dashboard" className="text-sm text-indigo-600 hover:underline mb-2 inline-block">← ダッシュボードに戻る</Link>
           <h1 className="text-2xl font-bold leading-tight text-gray-900">
-            プロジェクト: {projectName} {/* Propからプロジェクト名を表示 */}
+            プロジェクト: {projectName} {/* Wrapper内で管理するprojectNameを表示 */}
           </h1>
         </div>
       </header>

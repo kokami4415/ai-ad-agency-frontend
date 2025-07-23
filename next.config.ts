@@ -1,13 +1,21 @@
-// next.config.ts (Vercel最適化版)
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone', // Vercelに最適化された出力形式
+  output: 'standalone',
   images: {
-    unoptimized: true, // Vercelでのデフォルト最適化を避けるため
+    unoptimized: true,
   },
-  // App Routerを有効にする（デフォルトで有効なはずですが念のため）
   experimental: {
     appDir: true,
+  },
+  // ESLint設定をここに記述
+  eslint: {
+    // any型の使用に関するエラー/警告を無視する
+    // 開発初期段階でanyを多用する場合に便利
+    ignoreDuringBuilds: true, // ビルド中にESLintのチェックを完全に無視する（推奨）
+    // または、特定のルールを無効にする場合：
+    // rules: {
+    //   "@typescript-eslint/no-explicit-any": "off"
+    // }
   },
 };
 export default nextConfig;

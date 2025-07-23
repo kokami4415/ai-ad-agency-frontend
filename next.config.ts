@@ -4,9 +4,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  experimental: {
-    appDir: true,
-  },
   // ESLint設定をここに記述
   eslint: {
     // any型の使用に関するエラー/警告を無視する

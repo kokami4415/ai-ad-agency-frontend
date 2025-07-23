@@ -1,10 +1,10 @@
 // src/components/ProjectPageWrapper.tsx (最終確定版)
 "use client"; // クライアントコンポーネントであることを明示
 
-import { useEffect, useState, FormEvent, ReactNode } from 'react';
-import { useRequireAuth } from '@/contexts/AuthContext'; // クライアントコンポーネントなのでここでフックを呼ぶ
+import { useEffect, useState, FormEvent } from 'react';
+import { useRequireAuth } from '@/contexts/AuthContext';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from "firebase/functions";
+import { getFunctions, httpsCallable } from "firebase/functions"; // getFunctionsもインポート
 import { db, functions } from '@/lib/firebase';
 import Link from 'next/link';
 import Markdown from 'react-markdown';
@@ -16,18 +16,20 @@ interface AIResponse {
   strategyHypotheses: string;
 }
 
+// Propsの型定義を修正
 interface ProjectPageWrapperProps {
   projectId: string;
-  projectName: string;
-  // projectName: string; // page.tsxから渡されたものは初期値として使い、実際の取得はWrapper内で行う
+  projectName: string; // page.tsxから初期値として渡される
 }
 
-export default function ProjectPageWrapper({ projectId }: ProjectPageWrapperProps) {
+export default function ProjectPageWrapper({ projectId, projectName: initialProjectName }: ProjectPageWrapperProps) {
   const { user, loading: authLoading } = useRequireAuth(); // ユーザー認証状態を取得
-  const [projectName, setProjectName] = useState('読み込み中...'); // Wrapper内でprojectNameを管理
+
+  // プロジェクト名は初期値をPropsから受け取り、後で更新する
+  const [projectDisplayName, setProjectDisplayName] = useState(initialProjectName); 
   const [productInfo, setProductInfo] = useState('');
   const [aiResponse, setAiResponse] = useState<AIResponse | null>(null);
-  const [loading, setLoading] = useState(true); // 初期ロード状態
+  const [loading, setLoading] = useState(true); // Firestoreからのデータロード状態
   const [aiLoading, setAiLoading] = useState(false); // AI分析中状態
   const [error, setError] = useState('');
 
@@ -40,11 +42,12 @@ export default function ProjectPageWrapper({ projectId }: ProjectPageWrapperProp
         const docSnap = await getDoc(projectDocRef);
         if (docSnap.exists()) {
           const data = docSnap.data();
-          setProjectName(data.name); // プロジェクト名を更新
+          setProjectDisplayName(data.name); // プロジェクト名を更新
           setProductInfo(data.productInfo || '');
           setAiResponse(data.aiResponse || null);
         } else {
           setError("プロジェクトが見つかりません。");
+          setProjectDisplayName("プロジェクトが見つかりません"); // エラー表示
         }
         setLoading(false);
       };
@@ -69,7 +72,7 @@ export default function ProjectPageWrapper({ projectId }: ProjectPageWrapperProp
 
     try {
       // Firebase Functionsの 'analyzeProduct' 関数を呼び出す準備
-      const analyzeProductFunc = httpsCallable(functions, 'analyzeProduct'); // <-- 関数名を修正なし
+      const analyzeProductFunc = httpsCallable(functions, 'analyzeProduct');
       // 関数にデータを渡して実行
       const result = await analyzeProductFunc({ productInfo });
       const data = result.data as AIResponse;
@@ -86,7 +89,7 @@ export default function ProjectPageWrapper({ projectId }: ProjectPageWrapperProp
 
     } catch (err: any) {
       console.error("AI分析の呼び出しに失敗しました:", err);
-      setError(`エラーが発生しました: ${err.message}`);
+      setError(`AI分析の呼び出しに失敗しました: ${err.message}`);
     } finally {
       setAiLoading(false);
     }
@@ -102,7 +105,7 @@ export default function ProjectPageWrapper({ projectId }: ProjectPageWrapperProp
   }
 
   // プロジェクトが見つからないエラー
-  if (error && !projectName) { // projectStateがnullではなくprojectNameが設定されていない場合
+  if (error && projectDisplayName === "プロジェクトが見つかりません") {
     return <div className="flex items-center justify-center min-h-screen"><p>{error}</p></div>;
   }
 
@@ -112,7 +115,7 @@ export default function ProjectPageWrapper({ projectId }: ProjectPageWrapperProp
         <div className="max-w-4xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
           <Link href="/dashboard" className="text-sm text-indigo-600 hover:underline mb-2 inline-block">← ダッシュボードに戻る</Link>
           <h1 className="text-2xl font-bold leading-tight text-gray-900">
-            プロジェクト: {projectName} {/* Wrapper内で管理するprojectNameを表示 */}
+            プロジェクト: {projectDisplayName} {/* 更新可能なプロジェクト名 */}
           </h1>
         </div>
       </header>

@@ -18,6 +18,7 @@ interface AIResponse {
 
 interface ProjectPageWrapperProps {
   projectId: string;
+  projectName: string;
   // projectName: string; // page.tsxから渡されたものは初期値として使い、実際の取得はWrapper内で行う
 }
 

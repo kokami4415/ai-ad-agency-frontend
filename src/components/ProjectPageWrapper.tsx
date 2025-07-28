@@ -266,7 +266,7 @@ export default function ProjectPageWrapper({ projectId, projectName: initialProj
           ))}
           <div className="mt-6 text-right">
             {/* 【修正点】 disabledのロジックを修正 */}
-            <button onClick={handleAnalyzeStage1to2} disabled={aiLoading || currentStage !== 1} className="px-8 py-3 font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed">
+            <button onClick={handleAnalyzeStage1to2} disabled={aiLoading} className="px-8 py-3 font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed">
               {aiLoading ? 'AIサマリー生成中...' : 'AIにサマリーとペルソナ作成を依頼 →'}
             </button>
           </div>
@@ -299,7 +299,7 @@ export default function ProjectPageWrapper({ projectId, projectName: initialProj
             </div>
           )}
           <div className="mt-6 text-right">
-            <button onClick={handleAnalyzeStage2to3} disabled={aiLoading || currentStage > 2 || !stage2Data} className="px-8 py-3 font-semibold text-white bg-green-600 rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed">
+            <button onClick={handleAnalyzeStage2to3} disabled={aiLoading || !stage2Data} className="px-8 py-3 font-semibold text-white bg-green-600 rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed">
               {aiLoading ? '戦略仮説生成中...' : 'AIに戦略仮説の制作を依頼 →'}
             </button>
           </div>
@@ -329,7 +329,7 @@ export default function ProjectPageWrapper({ projectId, projectName: initialProj
             </div>
           )}
           <div className="mt-6 text-right">
-            <button disabled={aiLoading || currentStage > 3 || !stage3Data} className="px-8 py-3 font-semibold text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed">
+            <button disabled={aiLoading || !stage3Data} className="px-8 py-3 font-semibold text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed">
               {'AIに広告アウトプットの制作を依頼 →'}
             </button>
           </div>

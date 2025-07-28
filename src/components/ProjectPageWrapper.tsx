@@ -8,7 +8,7 @@ import { db, functions } from '@/lib/firebase';
 import Link from 'next/link';
 import Markdown from 'react-markdown';
 
-// --- 型定義 ---
+// --- Type Definitions ---
 interface AIResponseStage2Data {
   keywords: string;
   productElements: {
@@ -37,7 +37,7 @@ interface ProjectPageWrapperProps {
   projectName: string;
 }
 
-// --- コンポーネント本体 ---
+// --- Component ---
 export default function ProjectPageWrapper({ projectId, projectName: initialProjectName }: ProjectPageWrapperProps) {
   const { user, loading: authLoading } = useRequireAuth();
   const [projectDisplayName, setProjectDisplayName] = useState(initialProjectName);
@@ -59,6 +59,7 @@ export default function ProjectPageWrapper({ projectId, projectName: initialProj
   const [newInfoContent, setNewInfoContent] = useState('');
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
+  // --- Data Logic ---
   useEffect(() => {
     if (!authLoading && user) {
       const getProjectData = async () => {
@@ -213,7 +214,7 @@ export default function ProjectPageWrapper({ projectId, projectName: initialProj
       </header>
       
       <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
-        {/* ステージ1: 情報基盤 (Foundation) */}
+        {/* Stage 1 */}
         <div className="bg-white p-8 rounded-lg shadow mb-8">
           <h2 className="text-xl font-semibold text-gray-800 mb-6">1. 情報基盤 (Foundation)</h2>
           {stage1FieldDefinitions.map((fieldDef) => (
@@ -264,14 +265,15 @@ export default function ProjectPageWrapper({ projectId, projectName: initialProj
             </div>
           ))}
           <div className="mt-6 text-right">
-            <button onClick={handleAnalyzeStage1to2} disabled={aiLoading || currentStage > 1} className="px-8 py-3 font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed">
+            {/* 【修正点】 disabledのロジックを修正 */}
+            <button onClick={handleAnalyzeStage1to2} disabled={aiLoading || currentStage !== 1} className="px-8 py-3 font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed">
               {aiLoading ? 'AIサマリー生成中...' : 'AIにサマリーとペルソナ作成を依頼 →'}
             </button>
           </div>
           {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
         </div>
 
-        {/* ステージ2 */}
+        {/* Stage 2 */}
         <div className={`bg-white p-8 rounded-lg shadow mb-8 ${currentStage < 2 ? 'opacity-50 pointer-events-none' : ''}`}>
           <h2 className="text-xl font-semibold text-gray-800 mb-6">2. AIサマリー & ペルソナ</h2>
           {stage2Data && (
@@ -303,7 +305,7 @@ export default function ProjectPageWrapper({ projectId, projectName: initialProj
           </div>
         </div>
 
-        {/* ステージ3 */}
+        {/* Stage 3 */}
         <div className={`bg-white p-8 rounded-lg shadow mb-8 ${currentStage < 3 ? 'opacity-50 pointer-events-none' : ''}`}>
           <h2 className="text-xl font-semibold text-gray-800 mb-6">3. 戦略仮説 (LPファーストビュー)</h2>
           {stage3Data && (
@@ -332,6 +334,7 @@ export default function ProjectPageWrapper({ projectId, projectName: initialProj
             </button>
           </div>
         </div>
+
       </main>
     </div>
   );

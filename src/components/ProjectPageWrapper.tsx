@@ -80,9 +80,9 @@ export default function ProjectPageWrapper({ projectId, projectName: initialProj
             pastData: Array.isArray(data.stage1?.pastData) ? data.stage1.pastData : [],
           });
           
-          // 【FIX】 Corrected data loading logic for Stage 2 and 3
-          setStage2Data(data.stage2?.aiResponse || data.stage2 || null);
-          setStage3Data(data.stage3?.aiResponse || data.stage3 || null);
+          // 【FIX】 Simplified data loading to match the saving logic
+          setStage2Data(data.stage2 || null);
+          setStage3Data(data.stage3 || null);
 
         } else {
           setError("プロジェクトが見つかりません。");
@@ -341,7 +341,6 @@ export default function ProjectPageWrapper({ projectId, projectName: initialProj
             </button>
           </div>
         </div>
-
       </main>
     </div>
   );

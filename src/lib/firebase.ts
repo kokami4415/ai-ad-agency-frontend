@@ -23,6 +23,6 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 // 各Firebaseサービスのインスタンスを取得して、どこからでも使えるようにエクスポート
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const functions = getFunctions(app);
+export const functions = getFunctions(app, 'asia-northeast1');
 
 export default app;

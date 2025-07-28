@@ -1,4 +1,3 @@
-// src/components/ProjectPageWrapper.tsx (最終修正版)
 "use client";
 
 import { useEffect, useState, FormEvent } from 'react';
@@ -214,9 +213,62 @@ export default function ProjectPageWrapper({ projectId, projectName: initialProj
       </header>
       
       <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
-        {/* ステージ1 */}
+        {/* ステージ1: 情報基盤 (Foundation) */}
         <div className="bg-white p-8 rounded-lg shadow mb-8">
-          {/* ... (ステージ1のJSXは変更なし) ... */}
+          <h2 className="text-xl font-semibold text-gray-800 mb-6">1. 情報基盤 (Foundation)</h2>
+          {stage1FieldDefinitions.map((fieldDef) => (
+            <div key={fieldDef.key} className="mb-6 border-b pb-4 border-gray-100 last:border-b-0 last:pb-0">
+              <h3 className="text-lg font-semibold text-gray-700 mb-3">{fieldDef.label}</h3>
+              {stage1Data[fieldDef.key as keyof Stage1DataType].length > 0 ? (
+                <ul className="space-y-2 mb-4">
+                  {stage1Data[fieldDef.key as keyof Stage1DataType].map((item) => (
+                    <li key={item.id} className="bg-gray-50 p-3 rounded-md border border-gray-200 flex justify-between items-center text-sm">
+                      <span className="font-medium text-gray-800 truncate">{item.title}</span>
+                      <div className="flex space-x-2 ml-4">
+                        <button onClick={() => handleEditInfo(fieldDef.key as keyof Stage1DataType, item)} className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-md">編集</button>
+                        <button onClick={() => handleDeleteInfo(fieldDef.key as keyof Stage1DataType, item.id)} className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-800 rounded-md">削除</button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="text-gray-500 text-sm mb-4">まだ情報がありません。</p>}
+              <form onSubmit={handleAddOrUpdateInfo} className="space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <h4 className="font-semibold text-gray-800">{editingItemId && newInfoType === fieldDef.key ? `情報を編集` : `新しい${fieldDef.label}を追加`}</h4>
+                <input
+                  type="text"
+                  placeholder="タイトル"
+                  value={newInfoType === fieldDef.key ? newInfoTitle : ''}
+                  onChange={(e) => { setNewInfoType(fieldDef.key as keyof Stage1DataType); setNewInfoTitle(e.target.value); }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm shadow-sm"
+                  required
+                />
+                <textarea
+                  placeholder={fieldDef.placeholder}
+                  value={newInfoType === fieldDef.key ? newInfoContent : ''}
+                  onChange={(e) => { setNewInfoType(fieldDef.key as keyof Stage1DataType); setNewInfoContent(e.target.value); }}
+                  rows={3}
+                  className="w-full p-3 border border-gray-300 rounded-lg text-sm resize-y shadow-sm"
+                  required
+                ></textarea>
+                <div className="text-right">
+                  <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-md shadow-sm">
+                    {editingItemId && newInfoType === fieldDef.key ? '更新' : '追加'}
+                  </button>
+                  {editingItemId && newInfoType === fieldDef.key && (
+                    <button type="button" onClick={() => { setEditingItemId(null); setNewInfoTitle(''); setNewInfoContent(''); }} className="ml-2 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 text-sm font-semibold rounded-md shadow-sm">
+                      キャンセル
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+          ))}
+          <div className="mt-6 text-right">
+            <button onClick={handleAnalyzeStage1to2} disabled={aiLoading || currentStage > 1} className="px-8 py-3 font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed">
+              {aiLoading ? 'AIサマリー生成中...' : 'AIにサマリーとペルソナ作成を依頼 →'}
+            </button>
+          </div>
+          {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
         </div>
 
         {/* ステージ2 */}
@@ -231,7 +283,6 @@ export default function ProjectPageWrapper({ projectId, projectName: initialProj
               <div>
                 <h3 className="font-semibold text-gray-700 mb-2">商品要素</h3>
                 <ul className="list-disc list-inside text-gray-600 space-y-1">
-                  {/* 【修正点】 Optional Chaining (?.) を使って安全にアクセス */}
                   <li>**特徴:** {stage2Data.productElements?.features || 'なし'}</li>
                   <li>**メリット:** {stage2Data.productElements?.benefits || 'なし'}</li>
                   <li>**実績:** {stage2Data.productElements?.results || 'なし'}</li>
@@ -254,9 +305,33 @@ export default function ProjectPageWrapper({ projectId, projectName: initialProj
 
         {/* ステージ3 */}
         <div className={`bg-white p-8 rounded-lg shadow mb-8 ${currentStage < 3 ? 'opacity-50 pointer-events-none' : ''}`}>
-          {/* ... (ステージ3のJSXも変更なし) ... */}
+          <h2 className="text-xl font-semibold text-gray-800 mb-6">3. 戦略仮説 (LPファーストビュー)</h2>
+          {stage3Data && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="font-semibold text-gray-700 mb-2">キャッチコピー</h3>
+                <p>{stage3Data.catchCopy}</p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-700 mb-2">サブコピー</h3>
+                <p>{stage3Data.subCopy}</p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-700 mb-2">ビジュアルイメージ</h3>
+                <p>{stage3Data.visualImageDescription}</p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-700 mb-2">CTAボタン</h3>
+                <p>{stage3Data.ctaButtonText}</p>
+              </div>
+            </div>
+          )}
+          <div className="mt-6 text-right">
+            <button disabled={aiLoading || currentStage > 3 || !stage3Data} className="px-8 py-3 font-semibold text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed">
+              {'AIに広告アウトプットの制作を依頼 →'}
+            </button>
+          </div>
         </div>
-
       </main>
     </div>
   );

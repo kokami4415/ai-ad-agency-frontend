@@ -23,13 +23,6 @@ interface Stage2Data { productElements: ProductElements; }
 interface Stage3Data { creativeParts: string; }
 interface Stage4Data { catchCopy: string; subCopy: string; visualImageDescription: string; ctaButtonText: string; }
 
-// 【修正点】 stageLinksのための型定義を追加
-interface StageLink {
-  num: number;
-  path: string;
-  label: string;
-}
-
 export default function ProjectStagePage() {
   const { user } = useRequireAuth();
   const params = useParams();
@@ -39,12 +32,12 @@ export default function ProjectStagePage() {
   const stageSlug = Array.isArray(params.stage) ? params.stage[0] : 'stage1';
   const currentViewStage = parseInt(stageSlug.replace('stage', ''), 10) || 1;
 
-  // --- 全てのStateをここで管理 ---
+  // --- State管理 ---
   const [projectData, setProjectData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState('');
-
+  
   const [stage1Data, setStage1Data] = useState<Omit<Stage1Data, 'useDeepResearch'>>({
     productInfo: [], customerInfo: [], competitorInfo: [],
     marketInfo: [], brandInfo: [], pastData: [],
@@ -118,7 +111,7 @@ export default function ProjectStagePage() {
 
   const handleAnalyzeStage1to2 = async () => {
     if (stage1Data.productInfo.length === 0) {
-      setError("最低1つの商品情報を入力してください。");
+      setError("ステージ1で最低1つの商品情報を入力してください。");
       return;
     }
     setAiLoading(true);
@@ -136,7 +129,6 @@ export default function ProjectStagePage() {
           currentStage: 2,
           updatedAt: new Date(),
         });
-        router.push(`/dashboard/projects/${projectId}/stage2`);
       } else {
         throw new Error("AIサマリー生成に失敗しました。");
       }
@@ -148,7 +140,10 @@ export default function ProjectStagePage() {
   };
 
   const handleAnalyzeStage2to3 = async () => {
-    if (!stage2Data) return;
+    if (!stage2Data) {
+      setError("ステージ2のデータがありません。ステージ1の分析を先に実行してください。");
+      return;
+    }
     setAiLoading(true);
     setError('');
     try {
@@ -163,7 +158,6 @@ export default function ProjectStagePage() {
           currentStage: 3,
           updatedAt: new Date(),
         });
-        router.push(`/dashboard/projects/${projectId}/stage3`);
       } else {
         throw new Error("クリエイティブパーツの生成に失敗しました。");
       }
@@ -173,9 +167,12 @@ export default function ProjectStagePage() {
       setAiLoading(false);
     }
   };
-
+  
   const handleAnalyzeStage3to4 = async () => {
-    if (!stage2Data || !stage3Data) return;
+    if (!stage2Data || !stage3Data) {
+      setError("ステージ3のデータがありません。ステージ2の分析を先に実行してください。");
+      return;
+    }
     setAiLoading(true);
     setError('');
     try {
@@ -191,7 +188,6 @@ export default function ProjectStagePage() {
           currentStage: 4,
           updatedAt: new Date(),
         });
-        router.push(`/dashboard/projects/${projectId}/stage4`);
       } else {
         throw new Error("戦略仮説の生成に失敗しました。");
       }
@@ -207,7 +203,7 @@ export default function ProjectStagePage() {
   };
 
   if (loading) { return <div className="flex items-center justify-center min-h-screen"><p>プロジェクトを読み込み中...</p></div>; }
-
+  
   const stage1FieldDefinitions = [
     { key: 'productInfo', label: '商品情報' },
     { key: 'customerInfo', label: '顧客情報' },
@@ -216,7 +212,7 @@ export default function ProjectStagePage() {
     { key: 'brandInfo', label: '自社・ブランド情報' },
     { key: 'pastData', label: '過去の施策データ' },
   ];
-
+  
   const renderStageContent = () => {
     switch (currentViewStage) {
       case 1:
@@ -249,101 +245,100 @@ export default function ProjectStagePage() {
                 </form>
               </div>
             ))}
-            <div className="mt-8 flex justify-end items-center">
-              <label className="flex items-center mr-4 text-sm text-gray-600 cursor-pointer">
-                <input type="checkbox" checked={useDeepResearch} onChange={(e) => setUseDeepResearch(e.target.checked)} className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
-                <span className="ml-2">Deep Researchを行う</span>
-              </label>
-              <button onClick={handleAnalyzeStage1to2} disabled={aiLoading} className="px-8 py-3 font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed">
-                {aiLoading ? 'AIサマリー作成中...' : 'AIにサマリー作成を依頼 →'}
-              </button>
-            </div>
-            {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
           </div>
         );
       case 2:
         return (
           <div className="bg-white p-8 rounded-lg shadow mb-8">
+            <div className="mb-6 p-4 border-2 border-dashed rounded-lg flex justify-between items-center">
+              <p className="text-gray-600 text-sm">ステージ1の情報を基に、商品要素を抽出・更新します。</p>
+              <div className="flex items-center">
+                <label className="flex items-center mr-4 text-sm text-gray-600 cursor-pointer">
+                  <input type="checkbox" checked={useDeepResearch} onChange={(e) => setUseDeepResearch(e.target.checked)} className="h-4 w-4 text-indigo-600" />
+                  <span className="ml-2">Deep Research</span>
+                </label>
+                <button onClick={handleAnalyzeStage1to2} disabled={aiLoading} className="px-6 py-2 font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-indigo-300">
+                  {aiLoading ? '生成中...' : '商品要素を抽出'}
+                </button>
+              </div>
+            </div>
             <h2 className="text-xl font-semibold text-gray-800 mb-6">2. 商品要素抽出</h2>
             {stage2Data ? (
-              <div>
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <div className="prose prose-sm max-w-none text-gray-800">
-                    <Markdown>{`**特徴:**\n${stage2Data.productElements?.features || 'なし'}`}</Markdown> <hr className="my-2"/>
-                    <Markdown>{`**メリット:**\n${stage2Data.productElements?.benefits || 'なし'}`}</Markdown> <hr className="my-2"/>
-                    <Markdown>{`**実績:**\n${stage2Data.productElements?.results || 'なし'}`}</Markdown> <hr className="my-2"/>
-                    <Markdown>{`**権威性:**\n${stage2Data.productElements?.authority || 'なし'}`}</Markdown> <hr className="my-2"/>
-                    <Markdown>{`**オファー:**\n${stage2Data.productElements?.offer || 'なし'}`}</Markdown>
-                  </div>
-                </div>
-                <div className="mt-6 text-right">
-                  <button onClick={handleAnalyzeStage2to3} disabled={aiLoading} className="px-8 py-3 font-semibold text-white bg-green-600 rounded-md hover:bg-green-700 disabled:bg-gray-300">
-                    {aiLoading ? '生成中...' : 'AIにクリエイティブパーツの制作を依頼 →'}
-                  </button>
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <div className="prose prose-sm max-w-none text-gray-800">
+                  <Markdown>{`**特徴:**\n${stage2Data.productElements?.features || 'なし'}`}</Markdown> <hr className="my-2"/>
+                  <Markdown>{`**メリット:**\n${stage2Data.productElements?.benefits || 'なし'}`}</Markdown> <hr className="my-2"/>
+                  <Markdown>{`**実績:**\n${stage2Data.productElements?.results || 'なし'}`}</Markdown> <hr className="my-2"/>
+                  <Markdown>{`**権威性:**\n${stage2Data.productElements?.authority || 'なし'}`}</Markdown> <hr className="my-2"/>
+                  <Markdown>{`**オファー:**\n${stage2Data.productElements?.offer || 'なし'}`}</Markdown>
                 </div>
               </div>
-            ) : <p className="text-gray-500 text-sm">ステージ1の分析を完了してください。</p>}
-            {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
+            ) : <p className="text-center text-gray-500 py-8">まだ商品要素がありません。「商品要素を抽出」ボタンを押してください。</p>}
+            {error && <p className="text-red-500 text-sm mt-4 text-center">{error}</p>}
           </div>
         );
       case 3:
         return (
           <div className="bg-white p-8 rounded-lg shadow mb-8">
+            <div className="mb-6 p-4 border-2 border-dashed rounded-lg flex justify-between items-center">
+              <p className="text-gray-600 text-sm">ステージ2の商品要素を基に、広告表現のパーツを量産します。</p>
+              <button onClick={handleAnalyzeStage2to3} disabled={aiLoading} className="px-6 py-2 font-semibold text-white bg-green-600 rounded-md hover:bg-green-700 disabled:bg-gray-300">
+                {aiLoading ? '生成中...' : 'クリエイティブパーツを生成'}
+              </button>
+            </div>
             <h2 className="text-xl font-semibold text-gray-800 mb-6">3. クリエイティブパーツ</h2>
             {stage3Data ? (
-              <div>
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <div className="prose prose-sm max-w-none"><Markdown>{stage3Data.creativeParts}</Markdown></div>
-                </div>
-                <div className="mt-6 text-right">
-                  <button onClick={handleAnalyzeStage3to4} disabled={aiLoading} className="px-8 py-3 font-semibold text-white bg-green-600 rounded-md hover:bg-green-700 disabled:bg-gray-300">
-                    {aiLoading ? '生成中...' : 'AIに戦略仮説の制作を依頼 →'}
-                  </button>
-                </div>
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <div className="prose prose-sm max-w-none"><Markdown>{stage3Data.creativeParts}</Markdown></div>
               </div>
-            ) : <p className="text-gray-500 text-sm">ステージ2の分析を完了してください。</p>}
-            {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
+            ) : <p className="text-center text-gray-500 py-8">まだクリエイティブパーツがありません。「クリエイティブパーツを生成」ボタンを押してください。</p>}
+            {error && <p className="text-red-500 text-sm mt-4 text-center">{error}</p>}
           </div>
         );
       case 4:
         return (
           <div className="bg-white p-8 rounded-lg shadow mb-8">
+            <div className="mb-6 p-4 border-2 border-dashed rounded-lg flex justify-between items-center">
+              <p className="text-gray-600 text-sm">クリエイティブパーツを基に、LPの戦略仮説を構築します。</p>
+              <button onClick={handleAnalyzeStage3to4} disabled={aiLoading} className="px-6 py-2 font-semibold text-white bg-green-600 rounded-md hover:bg-green-700 disabled:bg-gray-300">
+                {aiLoading ? '生成中...' : '戦略仮説を生成'}
+              </button>
+            </div>
             <h2 className="text-xl font-semibold text-gray-800 mb-6">4. 戦略仮説</h2>
             {stage4Data ? (
-              <div>
-                <div className="space-y-6">
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <h3 className="font-semibold text-gray-700 mb-2">キャッチコピー</h3>
-                    <p className="text-gray-800 text-lg font-bold">{stage4Data.catchCopy}</p>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <h3 className="font-semibold text-gray-700 mb-2">サブコピー</h3>
-                    <p className="text-gray-600">{stage4Data.subCopy}</p>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <h3 className="font-semibold text-gray-700 mb-2">ビジュアルイメージ</h3>
-                    <p className="text-gray-600">{stage4Data.visualImageDescription}</p>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <h3 className="font-semibold text-gray-700 mb-2">CTAボタン</h3>
-                    <p className="text-gray-600 font-medium">{stage4Data.ctaButtonText}</p>
-                  </div>
+              <div className="space-y-6">
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <h3 className="font-semibold text-gray-700 mb-2">キャッチコピー</h3>
+                  <p className="text-gray-800 text-lg font-bold">{stage4Data.catchCopy}</p>
                 </div>
-                <div className="mt-6 text-right">
-                  <button onClick={handleAnalyzeStage4to5} disabled={aiLoading} className="px-8 py-3 font-semibold text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:bg-gray-300">
-                    {'AIに広告アウトプットの制作を依頼 →'}
-                  </button>
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <h3 className="font-semibold text-gray-700 mb-2">サブコピー</h3>
+                  <p className="text-gray-600">{stage4Data.subCopy}</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <h3 className="font-semibold text-gray-700 mb-2">ビジュアルイメージ</h3>
+                  <p className="text-gray-600">{stage4Data.visualImageDescription}</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <h3 className="font-semibold text-gray-700 mb-2">CTAボタン</h3>
+                  <p className="text-gray-600 font-medium">{stage4Data.ctaButtonText}</p>
                 </div>
               </div>
-            ) : <p className="text-gray-500 text-sm">ステージ3を完了してください。</p>}
-            {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
+            ) : <p className="text-center text-gray-500 py-8">まだ戦略仮説がありません。「戦略仮説を生成」ボタンを押してください。</p>}
+            {error && <p className="text-red-500 text-sm mt-4 text-center">{error}</p>}
           </div>
         );
       case 5:
         return (
           <div className="bg-white p-8 rounded-lg shadow mb-8">
+            <div className="mb-6 p-4 border-2 border-dashed rounded-lg flex justify-between items-center">
+              <p className="text-gray-600 text-sm">戦略仮説を基に、具体的な広告クリエイティブを生成します。</p>
+              <button onClick={handleAnalyzeStage4to5} disabled={aiLoading} className="px-6 py-2 font-semibold text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:bg-gray-300">
+                {aiLoading ? '生成中...' : 'アウトプットを生成'}
+              </button>
+            </div>
             <h2 className="text-xl font-semibold text-gray-800 mb-6">5. アウトプット</h2>
-            <p className="text-gray-600">この機能は現在開発中です。</p>
+            <p className="text-center text-gray-500 py-8">この機能は現在開発中です。</p>
           </div>
         );
       default:
@@ -352,7 +347,7 @@ export default function ProjectStagePage() {
   };
 
   const currentStage = projectData?.currentStage || 1;
-  const stageLinks: StageLink[] = [ // 【修正点】 型を適用
+  const stageLinks = [
     { num: 1, path: `/stage1`, label: "1. 情報基盤" },
     { num: 2, path: `/stage2`, label: "2. 商品要素抽出" },
     { num: 3, path: `/stage3`, label: "3. クリエイティブパーツ" },
@@ -391,6 +386,7 @@ export default function ProjectStagePage() {
             );
           })}
         </div>
+        {error && <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md text-sm">{error}</div>}
         {renderStageContent()}
       </main>
     </div>

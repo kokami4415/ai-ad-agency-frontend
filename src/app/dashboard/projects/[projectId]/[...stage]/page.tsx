@@ -59,7 +59,7 @@ export default function ProjectStagePage() {
           const data = docSnap.data();
           setProjectData(data);
           const currentDbStage = data.currentStage || 1;
-          if (currentViewStage > currentDbStage + 1 && currentViewStage < 5) {
+          if (currentViewStage > currentDbStage + 1 && currentViewStage <= 5) { 
             router.push(`/dashboard/projects/${projectId}/stage${currentDbStage}`);
           }
           setStage1Data(data.stage1 || { productInfo: [], customerInfo: [], competitorInfo: [], marketInfo: [], brandInfo: [], pastData: [] });
@@ -175,7 +175,6 @@ export default function ProjectStagePage() {
     { key: 'pastData' as Stage1Key, label: '過去の施策データ' },
   ];
   
-  // 【修正点】 関数の戻り値の型を : ReactNode として明示的に指定
   const renderStageContent = (): ReactNode => {
     switch (currentViewStage) {
       case 1:
@@ -330,7 +329,8 @@ export default function ProjectStagePage() {
         <div className="mb-8 p-2 bg-white rounded-lg shadow-md flex justify-around border border-gray-200">
           {stageLinks.map(link => {
             const isActive = stageSlug === `stage${link.num}`;
-            const isEnabled = link.num <= currentStage;
+            // 【修正点】 タブが有効になる条件を「現在のステージ+1」までに変更
+            const isEnabled = link.num <= currentStage + 1 && link.num <= 5;
             return (
               <Link 
                 key={link.num}

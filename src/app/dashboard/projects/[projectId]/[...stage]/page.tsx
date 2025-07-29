@@ -36,7 +36,7 @@ export default function ProjectStagePage() {
   const [loading, setLoading] = useState(true);
   const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState('');
-
+  
   const [stage1Data, setStage1Data] = useState<Omit<Stage1Data, 'useDeepResearch'>>({
     productInfo: [], customerInfo: [], competitorInfo: [],
     marketInfo: [], brandInfo: [], pastData: [],
@@ -59,7 +59,7 @@ export default function ProjectStagePage() {
           const data = docSnap.data();
           setProjectData(data);
           const currentDbStage = data.currentStage || 1;
-          if (currentViewStage > currentDbStage + 1 && currentViewStage < 5) { 
+          if (currentViewStage > currentDbStage + 1 && currentViewStage < 5) {
             router.push(`/dashboard/projects/${projectId}/stage${currentDbStage}`);
           }
           setStage1Data(data.stage1 || { productInfo: [], customerInfo: [], competitorInfo: [], marketInfo: [], brandInfo: [], pastData: [] });
@@ -142,7 +142,7 @@ export default function ProjectStagePage() {
     } catch (err: any) { setError(`AI呼び出しに失敗しました: ${err.message}`);
     } finally { setAiLoading(false); }
   };
-
+  
   const handleAnalyzeStage3to4 = async () => {
     if (!stage2Data || !stage3Data) { setError("ステージ3のデータがありません。"); return; }
     setAiLoading(true); setError('');
@@ -165,7 +165,7 @@ export default function ProjectStagePage() {
   const handleAnalyzeStage4to5 = () => { alert("ステージ5は現在開発中です。"); };
 
   if (loading) { return <div className="flex items-center justify-center min-h-screen"><p>プロジェクトを読み込み中...</p></div>; }
-
+  
   const stage1FieldDefinitions = [
     { key: 'productInfo' as Stage1Key, label: '商品情報' },
     { key: 'customerInfo' as Stage1Key, label: '顧客情報' },
@@ -174,9 +174,136 @@ export default function ProjectStagePage() {
     { key: 'brandInfo' as Stage1Key, label: '自社・ブランド情報' },
     { key: 'pastData' as Stage1Key, label: '過去の施策データ' },
   ];
-
+  
+  // 【修正点】 関数の戻り値の型を : ReactNode として明示的に指定
   const renderStageContent = (): ReactNode => {
-    // ... (renderStageContentの中身は変更なし) ...
+    switch (currentViewStage) {
+      case 1:
+        return (
+          <div className="bg-white p-8 rounded-lg shadow mb-8">
+            {stage1FieldDefinitions.map((fieldDef) => (
+              <div key={fieldDef.key} className="mb-6 border-b pb-4 border-gray-100 last:border-b-0 last:pb-0">
+                <h3 className="text-lg font-semibold text-gray-700 mb-3">{fieldDef.label}</h3>
+                {stage1Data[fieldDef.key].length > 0 ? (
+                  <ul className="space-y-2 mb-4">
+                    {stage1Data[fieldDef.key].map((item) => (
+                      <li key={item.id} className="bg-gray-50 p-3 rounded-md border border-gray-200 flex justify-between items-center text-sm">
+                        <span className="font-medium text-gray-800 truncate">{item.title}</span>
+                        <div className="flex space-x-2 ml-4">
+                          <button onClick={() => handleEditInfo(fieldDef.key, item)} className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-md">編集</button>
+                          <button onClick={() => handleDeleteInfo(fieldDef.key, item.id)} className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-800 rounded-md">削除</button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : <p className="text-gray-500 text-sm mb-4">まだ情報がありません。</p>}
+                <form onSubmit={handleAddOrUpdateInfo} className="space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <h4 className="font-semibold text-gray-800">{editingItemId && newInfoType === fieldDef.key ? `情報を編集` : `新しい${fieldDef.label}を追加`}</h4>
+                  <input type="text" placeholder="タイトル" value={newInfoType === fieldDef.key ? newInfoTitle : ''} onChange={(e) => { setNewInfoType(fieldDef.key); setNewInfoTitle(e.target.value); }} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm shadow-sm" required />
+                  <textarea placeholder="ここに内容を入力..." value={newInfoType === fieldDef.key ? newInfoContent : ''} onChange={(e) => { setNewInfoType(fieldDef.key); setNewInfoContent(e.target.value); }} rows={3} className="w-full p-3 border border-gray-300 rounded-lg text-sm resize-y shadow-sm" required></textarea>
+                  <div className="text-right">
+                    <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-md shadow-sm">{editingItemId && newInfoType === fieldDef.key ? '更新' : '追加'}</button>
+                    {editingItemId && newInfoType === fieldDef.key && (<button type="button" onClick={() => { setEditingItemId(null); setNewInfoTitle(''); setNewInfoContent(''); }} className="ml-2 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 text-sm font-semibold rounded-md shadow-sm">キャンセル</button>)}
+                  </div>
+                </form>
+              </div>
+            ))}
+          </div>
+        );
+      case 2:
+        return (
+          <div className="bg-white p-8 rounded-lg shadow mb-8">
+            <div className="mb-6 p-4 border-2 border-dashed rounded-lg flex justify-between items-center">
+              <p className="text-gray-600 text-sm">ステージ1の情報を基に、商品要素を抽出・更新します。</p>
+              <div className="flex items-center">
+                <label className="flex items-center mr-4 text-sm text-gray-600 cursor-pointer">
+                  <input type="checkbox" checked={useDeepResearch} onChange={(e) => setUseDeepResearch(e.target.checked)} className="h-4 w-4 text-indigo-600" />
+                  <span className="ml-2">Deep Research</span>
+                </label>
+                <button onClick={handleAnalyzeStage1to2} disabled={aiLoading} className="px-6 py-2 font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-indigo-300">
+                  {aiLoading ? '生成中...' : '商品要素を抽出'}
+                </button>
+              </div>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-800 mb-6">2. 商品要素抽出</h2>
+            {stage2Data ? (
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <div className="prose prose-sm max-w-none text-gray-800">
+                  <Markdown>{`**特徴:**\n${stage2Data.productElements?.features || 'なし'}`}</Markdown> <hr className="my-2"/>
+                  <Markdown>{`**メリット:**\n${stage2Data.productElements?.benefits || 'なし'}`}</Markdown> <hr className="my-2"/>
+                  <Markdown>{`**実績:**\n${stage2Data.productElements?.results || 'なし'}`}</Markdown> <hr className="my-2"/>
+                  <Markdown>{`**権威性:**\n${stage2Data.productElements?.authority || 'なし'}`}</Markdown> <hr className="my-2"/>
+                  <Markdown>{`**オファー:**\n${stage2Data.productElements?.offer || 'なし'}`}</Markdown>
+                </div>
+              </div>
+            ) : <p className="text-center text-gray-500 py-8">まだ商品要素がありません。「商品要素を抽出」ボタンを押してください。</p>}
+          </div>
+        );
+      case 3:
+        return (
+          <div className="bg-white p-8 rounded-lg shadow mb-8">
+            <div className="mb-6 p-4 border-2 border-dashed rounded-lg flex justify-between items-center">
+              <p className="text-gray-600 text-sm">ステージ2の商品要素を基に、広告表現のパーツを量産します。</p>
+              <button onClick={handleAnalyzeStage2to3} disabled={aiLoading} className="px-6 py-2 font-semibold text-white bg-green-600 rounded-md hover:bg-green-700 disabled:bg-gray-300">
+                {aiLoading ? '生成中...' : 'クリエイティブパーツを生成'}
+              </button>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-800 mb-6">3. クリエイティブパーツ</h2>
+            {stage3Data ? (
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <div className="prose prose-sm max-w-none"><Markdown>{stage3Data.creativeParts}</Markdown></div>
+              </div>
+            ) : <p className="text-center text-gray-500 py-8">まだクリエイティブパーツがありません。「クリエイティブパーツを生成」ボタンを押してください。</p>}
+          </div>
+        );
+      case 4:
+        return (
+          <div className="bg-white p-8 rounded-lg shadow mb-8">
+            <div className="mb-6 p-4 border-2 border-dashed rounded-lg flex justify-between items-center">
+              <p className="text-gray-600 text-sm">クリエイティブパーツを基に、LPの戦略仮説を構築します。</p>
+              <button onClick={handleAnalyzeStage3to4} disabled={aiLoading} className="px-6 py-2 font-semibold text-white bg-green-600 rounded-md hover:bg-green-700 disabled:bg-gray-300">
+                {aiLoading ? '生成中...' : '戦略仮説を生成'}
+              </button>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-800 mb-6">4. 戦略仮説</h2>
+            {stage4Data ? (
+              <div className="space-y-6">
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <h3 className="font-semibold text-gray-700 mb-2">キャッチコピー</h3>
+                  <p className="text-gray-800 text-lg font-bold">{stage4Data.catchCopy}</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <h3 className="font-semibold text-gray-700 mb-2">サブコピー</h3>
+                  <p className="text-gray-600">{stage4Data.subCopy}</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <h3 className="font-semibold text-gray-700 mb-2">ビジュアルイメージ</h3>
+                  <p className="text-gray-600">{stage4Data.visualImageDescription}</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <h3 className="font-semibold text-gray-700 mb-2">CTAボタン</h3>
+                  <p className="text-gray-600 font-medium">{stage4Data.ctaButtonText}</p>
+                </div>
+              </div>
+            ) : <p className="text-center text-gray-500 py-8">まだ戦略仮説がありません。「戦略仮説を生成」ボタンを押してください。</p>}
+          </div>
+        );
+      case 5:
+        return (
+          <div className="bg-white p-8 rounded-lg shadow mb-8">
+            <div className="mb-6 p-4 border-2 border-dashed rounded-lg flex justify-between items-center">
+              <p className="text-gray-600 text-sm">戦略仮説を基に、具体的な広告クリエイティブを生成します。</p>
+              <button onClick={handleAnalyzeStage4to5} disabled={aiLoading} className="px-6 py-2 font-semibold text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:bg-gray-300">
+                {aiLoading ? '生成中...' : 'アウトプットを生成'}
+              </button>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-800 mb-6">5. アウトプット</h2>
+            <p className="text-center text-gray-500 py-8">この機能は現在開発中です。</p>
+          </div>
+        );
+      default:
+        return <p>無効なステージです。</p>;
+    }
   };
 
   const currentStage = projectData?.currentStage || 1;
@@ -190,13 +317,20 @@ export default function ProjectStagePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm sticky top-0 z-10">{/* ... */}</header>
+      <header className="bg-white shadow-sm sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+          <Link href="/dashboard" className="text-sm text-indigo-600 hover:underline mb-2 inline-block">← ダッシュボードに戻る</Link>
+          <h1 className="text-2xl font-bold leading-tight text-gray-900">
+            プロジェクト: {projectData?.name || '...'}
+          </h1>
+        </div>
+      </header>
+
       <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="mb-8 p-2 bg-white rounded-lg shadow-md flex justify-around border border-gray-200">
           {stageLinks.map(link => {
             const isActive = stageSlug === `stage${link.num}`;
-            // 【修正点】 タブが有効になる条件を「現在のステージ+1」までに変更
-            const isEnabled = link.num <= currentStage + 1 && link.num <= 5;
+            const isEnabled = link.num <= currentStage;
             return (
               <Link 
                 key={link.num}

@@ -1,7 +1,7 @@
-// src/app/dashboard/projects/[projectId]/layout.tsx (修正後)
+// src/app/dashboard/projects/[projectId]/layout.tsx (型定義修正版)
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, ReactNode } from 'react';
 import { useRequireAuth } from '@/contexts/AuthContext';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -9,15 +9,24 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ProjectProvider, useProject } from '@/contexts/ProjectContext';
 
-function ProjectLayout({ children, params }: { children: React.ReactNode, params: { projectId: string }}) {
+// 【修正点】 正しいPropsの型を定義
+interface ProjectLayoutParams {
+  children: ReactNode;
+  params: {
+    projectId: string;
+  };
+}
+
+function ProjectLayout({ children, params }: ProjectLayoutParams) {
   const { user } = useRequireAuth();
   const pathname = usePathname();
   const { projectData, setProjectData, setLoading, setError } = useProject();
+  const { projectId } = params;
 
   useEffect(() => {
-    if (user && params.projectId) {
+    if (user && projectId) {
       setLoading(true);
-      const projectDocRef = doc(db, "users", user.uid, "projects", params.projectId);
+      const projectDocRef = doc(db, "users", user.uid, "projects", projectId);
       const unsubscribe = onSnapshot(projectDocRef, (docSnap) => {
         if (docSnap.exists()) {
           setProjectData(docSnap.data());
@@ -32,7 +41,7 @@ function ProjectLayout({ children, params }: { children: React.ReactNode, params
       });
       return () => unsubscribe();
     }
-  }, [user, params.projectId, setProjectData, setLoading, setError]);
+  }, [user, projectId, setProjectData, setLoading, setError]);
 
   const currentStage = projectData?.currentStage || 1;
   const stageLinks = [
@@ -61,7 +70,7 @@ function ProjectLayout({ children, params }: { children: React.ReactNode, params
             return (
               <Link 
                 key={link.num}
-                href={isEnabled ? `/dashboard/projects/${params.projectId}${link.path}` : '#'}
+                href={isEnabled ? `/dashboard/projects/${projectId}${link.path}` : '#'}
                 className={`flex-1 text-center px-4 py-2 text-sm font-medium rounded-md transition-colors
                   ${isActive ? 'bg-indigo-600 text-white shadow' : 'text-gray-700 hover:bg-gray-100'}
                   ${!isEnabled ? 'opacity-50 cursor-not-allowed' : ''}
@@ -79,7 +88,7 @@ function ProjectLayout({ children, params }: { children: React.ReactNode, params
   );
 }
 
-export default function ProjectLayoutWrapper({ children, params }: { children: React.ReactNode, params: { projectId: string }}) {
+export default function ProjectLayoutWrapper({ children, params }: ProjectLayoutParams) {
   return (
     <ProjectProvider>
       <ProjectLayout params={params}>{children}</ProjectLayout>

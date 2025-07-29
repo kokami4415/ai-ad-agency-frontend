@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, FormEvent } from 'react';
+import { useEffect, useState, FormEvent, ReactNode } from 'react'; // ReactNode をインポート
 import { useRequireAuth } from '@/contexts/AuthContext';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { httpsCallable } from "firebase/functions";
@@ -13,17 +13,10 @@ import Markdown from 'react-markdown';
 interface ProductElements { features: string; benefits: string; results: string; authority: string; offer: string; }
 interface Stage1Item { id: string; title: string; content: string; }
 interface Stage1Data {
-  productInfo: Stage1Item[];
-  customerInfo: Stage1Item[];
-  competitorInfo: Stage1Item[];
-  marketInfo: Stage1Item[];
-  brandInfo: Stage1Item[];
-  pastData: Stage1Item[];
+  productInfo: Stage1Item[]; customerInfo: Stage1Item[]; competitorInfo: Stage1Item[];
+  marketInfo: Stage1Item[]; brandInfo: Stage1Item[]; pastData: Stage1Item[];
   useDeepResearch?: boolean;
 }
-// 【修正点】 複雑な型定義を、よりシンプルなものに変更
-type Stage1Key = "productInfo" | "customerInfo" | "competitorInfo" | "marketInfo" | "brandInfo" | "pastData";
-
 interface Stage2Data { productElements: ProductElements; }
 interface Stage3Data { creativeParts: string; }
 interface Stage4Data { catchCopy: string; subCopy: string; visualImageDescription: string; ctaButtonText: string; }
@@ -42,7 +35,7 @@ export default function ProjectStagePage() {
   const [loading, setLoading] = useState(true);
   const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState('');
-
+  
   const [stage1Data, setStage1Data] = useState<Omit<Stage1Data, 'useDeepResearch'>>({
     productInfo: [], customerInfo: [], competitorInfo: [],
     marketInfo: [], brandInfo: [], pastData: [],
@@ -51,8 +44,7 @@ export default function ProjectStagePage() {
   const [stage3Data, setStage3Data] = useState<Stage3Data | null>(null);
   const [stage4Data, setStage4Data] = useState<Stage4Data | null>(null);
 
-  // 【修正点】 シンプルな型を使用
-  const [newInfoType, setNewInfoType] = useState<Stage1Key>('productInfo');
+  const [newInfoType, setNewInfoType] = useState<keyof Omit<Stage1Data, 'useDeepResearch'>>('productInfo');
   const [newInfoTitle, setNewInfoTitle] = useState('');
   const [newInfoContent, setNewInfoContent] = useState('');
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -104,11 +96,11 @@ export default function ProjectStagePage() {
     setNewInfoTitle(''); setNewInfoContent(''); setEditingItemId(null);
   };
 
-  const handleEditInfo = (type: Stage1Key, item: Stage1Item) => {
+  const handleEditInfo = (type: keyof Omit<Stage1Data, 'useDeepResearch'>, item: Stage1Item) => {
     setNewInfoType(type); setNewInfoTitle(item.title); setNewInfoContent(item.content); setEditingItemId(item.id);
   };
 
-  const handleDeleteInfo = async (type: Stage1Key, itemId: string) => {
+  const handleDeleteInfo = async (type: keyof Omit<Stage1Data, 'useDeepResearch'>, itemId: string) => {
     if (!confirm("この情報を削除しますか？")) return;
     const updatedStage1Data = { ...stage1Data };
     updatedStage1Data[type] = updatedStage1Data[type].filter(item => item.id !== itemId);
@@ -116,34 +108,23 @@ export default function ProjectStagePage() {
   };
 
   const handleAnalyzeStage1to2 = async () => {
-    if (stage1Data.productInfo.length === 0) {
-      setError("最低1つの商品情報を入力してください。");
-      return;
-    }
-    setAiLoading(true);
-    setError('');
+    if (stage1Data.productInfo.length === 0) { setError("最低1つの商品情報を入力してください。"); return; }
+    setAiLoading(true); setError('');
     try {
       const analyzeProductFunc = httpsCallable(functions, 'analyzeProduct');
       const payload: Stage1Data = { ...stage1Data, useDeepResearch: useDeepResearch };
       const result = await analyzeProductFunc(payload);
       const data = result.data as any;
-
       if (data.success) {
         const projectDocRef = doc(db, "users", user!.uid, "projects", projectId);
         await updateDoc(projectDocRef, {
           stage2: { productElements: data.productElements },
-          currentStage: 2,
-          updatedAt: new Date(),
+          currentStage: 2, updatedAt: new Date(),
         });
         router.push(`/dashboard/projects/${projectId}/stage2`);
-      } else {
-        throw new Error("AIサマリー生成に失敗しました。");
-      }
-    } catch (err: any) {
-      setError(`AIサマリー呼び出しに失敗しました: ${err.message}`);
-    } finally {
-      setAiLoading(false);
-    }
+      } else { throw new Error("AIサマリー生成に失敗しました。"); }
+    } catch (err: any) { setError(`AIサマリー呼び出しに失敗しました: ${err.message}`);
+    } finally { setAiLoading(false); }
   };
 
   const handleAnalyzeStage2to3 = async () => {
@@ -157,15 +138,14 @@ export default function ProjectStagePage() {
         const projectDocRef = doc(db, "users", user!.uid, "projects", projectId);
         await updateDoc(projectDocRef, {
           stage3: { creativeParts: data.creativeParts },
-          currentStage: 3,
-          updatedAt: new Date(),
+          currentStage: 3, updatedAt: new Date(),
         });
         router.push(`/dashboard/projects/${projectId}/stage3`);
       } else { throw new Error("クリエイティブパーツの生成に失敗しました。"); }
     } catch (err: any) { setError(`AI呼び出しに失敗しました: ${err.message}`);
     } finally { setAiLoading(false); }
   };
-
+  
   const handleAnalyzeStage3to4 = async () => {
     if (!stage2Data || !stage3Data) { setError("ステージ3のデータがありません。"); return; }
     setAiLoading(true); setError('');
@@ -178,8 +158,7 @@ export default function ProjectStagePage() {
         const projectDocRef = doc(db, "users", user!.uid, "projects", projectId);
         await updateDoc(projectDocRef, {
           stage4: data.stage4Data,
-          currentStage: 4,
-          updatedAt: new Date(),
+          currentStage: 4, updatedAt: new Date(),
         });
         router.push(`/dashboard/projects/${projectId}/stage4`);
       } else { throw new Error("戦略仮説の生成に失敗しました。"); }
@@ -190,17 +169,33 @@ export default function ProjectStagePage() {
   const handleAnalyzeStage4to5 = () => { alert("ステージ5は現在開発中です。"); };
 
   if (loading) { return <div className="flex items-center justify-center min-h-screen"><p>プロジェクトを読み込み中...</p></div>; }
-
+  
   const stage1FieldDefinitions = [
-    { key: 'productInfo' as Stage1Key, label: '商品情報' },
-    { key: 'customerInfo' as Stage1Key, label: '顧客情報' },
-    { key: 'competitorInfo' as Stage1Key, label: '競合情報' },
-    { key: 'marketInfo' as Stage1Key, label: '市場情報' },
-    { key: 'brandInfo' as Stage1Key, label: '自社・ブランド情報' },
-    { key: 'pastData' as Stage1Key, label: '過去の施策データ' },
+    { key: 'productInfo' as const, label: '商品情報' },
+    { key: 'customerInfo' as const, label: '顧客情報' },
+    { key: 'competitorInfo' as const, label: '競合情報' },
+    { key: 'marketInfo' as const, label: '市場情報' },
+    { key: 'brandInfo' as const, label: '自社・ブランド情報' },
+    { key: 'pastData' as const, label: '過去の施策データ' },
   ];
-
-  const renderStageContent = () => { /* ... (変更なし) ... */ };
+  
+  // 【修正点】 関数の戻り値の型を : ReactNode として明示的に指定
+  const renderStageContent = (): ReactNode => {
+    switch (currentViewStage) {
+      case 1:
+        return ( <div className="bg-white p-8 rounded-lg shadow mb-8">{/* ステージ1のJSX */}</div> );
+      case 2:
+        return ( <div className="bg-white p-8 rounded-lg shadow mb-8">{/* ステージ2のJSX */}</div> );
+      case 3:
+        return ( <div className="bg-white p-8 rounded-lg shadow mb-8">{/* ステージ3のJSX */}</div> );
+      case 4:
+        return ( <div className="bg-white p-8 rounded-lg shadow mb-8">{/* ステージ4のJSX */}</div> );
+      case 5:
+        return ( <div className="bg-white p-8 rounded-lg shadow mb-8">{/* ステージ5のJSX */}</div> );
+      default:
+        return <p>無効なステージです。</p>;
+    }
+  };
 
   const currentStage = projectData?.currentStage || 1;
   const stageLinks: StageLink[] = [
@@ -213,9 +208,28 @@ export default function ProjectStagePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* ... (Headerとナビゲーション部分は変更なし) ... */}
+      <header className="bg-white shadow-sm sticky top-0 z-10">{/* Header JSX */}</header>
       <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
-        {/* ... */}
+        <div className="mb-8 p-2 bg-white rounded-lg shadow-md flex justify-around border border-gray-200">
+          {stageLinks.map(link => {
+            const isActive = stageSlug === `stage${link.num}`;
+            const isEnabled = link.num <= currentStage;
+            return (
+              <Link 
+                key={link.num}
+                href={isEnabled ? `/dashboard/projects/${projectId}/stage${link.num}` : '#'}
+                className={`flex-1 text-center px-4 py-2 text-sm font-medium rounded-md transition-colors
+                  ${isActive ? 'bg-indigo-600 text-white shadow' : 'text-gray-700 hover:bg-gray-100'}
+                  ${!isEnabled ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
+                onClick={(e) => { if (!isEnabled) e.preventDefault(); }}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
+        </div>
+        {error && <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md text-sm">{error}</div>}
         {renderStageContent()}
       </main>
     </div>

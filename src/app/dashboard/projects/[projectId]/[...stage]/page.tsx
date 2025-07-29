@@ -2,7 +2,7 @@
 
 import { useEffect, useState, FormEvent } from 'react';
 import { useRequireAuth } from '@/contexts/AuthContext';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from '@/lib/firebase';
 import Link from 'next/link';
@@ -71,7 +71,6 @@ export default function ProjectStagePage() {
           if (currentViewStage > currentDbStage) {
             router.push(`/dashboard/projects/${projectId}/stage${currentDbStage}`);
           }
-          // Set stage-specific data from the full project data
           setStage1Data(data.stage1 || { productInfo: [], customerInfo: [], competitorInfo: [], marketInfo: [], brandInfo: [], pastData: [] });
           setStage2Data(data.stage2 || null);
           setStage3Data(data.stage3 || null);
@@ -82,9 +81,8 @@ export default function ProjectStagePage() {
       });
       return () => unsubscribe();
     }
-  }, [user, projectId, router]); // currentViewStageを依存配列から削除
+  }, [user, projectId, router, currentViewStage]);
 
-  // --- 全てのハンドラ関数をここで管理 ---
   const saveStage1DataToFirestore = async (updatedData: Omit<Stage1DataType, 'useDeepResearch'>) => {
     if (!user) return;
     const projectDocRef = doc(db, "users", user.uid, "projects", projectId);
@@ -119,44 +117,166 @@ export default function ProjectStagePage() {
   };
 
   const handleAnalyzeStage1to2 = async () => {
-    // ... (以前のコードと同じロジック) ...
+    if (stage1Data.productInfo.length === 0) {
+      setError("最低1つの商品情報を入力してください。");
+      return;
+    }
+    setAiLoading(true);
+    setError('');
+    try {
+      const analyzeProductFunc = httpsCallable(functions, 'analyzeProduct');
+      const payload: Stage1DataType = { ...stage1Data, useDeepResearch: useDeepResearch };
+      const result = await analyzeProductFunc(payload);
+      const data = result.data as any;
+
+      if (data.success) {
+        const projectDocRef = doc(db, "users", user!.uid, "projects", projectId);
+        await updateDoc(projectDocRef, {
+          stage2: { productElements: data.productElements },
+          currentStage: 2,
+          updatedAt: new Date(),
+        });
+        router.push(`/dashboard/projects/${projectId}/stage2`);
+      } else {
+        throw new Error("AIサマリー生成に失敗しました。");
+      }
+    } catch (err: any) {
+      setError(`AIサマリー呼び出しに失敗しました: ${err.message}`);
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const handleAnalyzeStage2to3 = async () => {
-    // ... (以前のコードと同じロジック) ...
+    if (!stage2Data) return;
+    setAiLoading(true);
+    setError('');
+    try {
+      const generateLpFirstViewFunc = httpsCallable(functions, 'generateLpFirstView');
+      const result = await generateLpFirstViewFunc(stage2Data);
+      const data = result.data as { success: boolean; stage3Data: AIResponseStage3Data; };
+      if (data.success) {
+        const projectDocRef = doc(db, "users", user!.uid, "projects", projectId);
+        await updateDoc(projectDocRef, {
+          stage3: data.stage3Data,
+          currentStage: 3,
+          updatedAt: new Date(),
+        });
+        router.push(`/dashboard/projects/${projectId}/stage3`);
+      } else {
+        throw new Error("戦略仮説生成に失敗しました。");
+      }
+    } catch (err: any) {
+      setError(`戦略仮説呼び出しに失敗しました: ${err.message}`);
+    } finally {
+      setAiLoading(false);
+    }
   };
-  
+
   const handleAnalyzeStage3to4 = async () => {
     alert("ステージ4は現在開発中です。");
     router.push(`/dashboard/projects/${projectId}/stage4`);
   };
 
-  // --- 表示するステージを切り替える ---
+  const stage1FieldDefinitions = [
+    { key: 'productInfo', label: '商品情報' },
+    { key: 'customerInfo', label: '顧客情報' },
+    { key: 'competitorInfo', label: '競合情報' },
+    { key: 'marketInfo', label: '市場情報' },
+    { key: 'brandInfo', label: '自社・ブランド情報' },
+    { key: 'pastData', label: '過去の施策データ' },
+  ];
+  
   const renderStageContent = () => {
     switch (currentViewStage) {
       case 1:
-        // ステージ1のUI
         return (
           <div className="bg-white p-8 rounded-lg shadow mb-8">
-            {/* ... ステージ1の完全なJSX ... */}
+            {stage1FieldDefinitions.map((fieldDef) => (
+              <div key={fieldDef.key} className="mb-6 border-b pb-4 border-gray-100 last:border-b-0 last:pb-0">
+                <h3 className="text-lg font-semibold text-gray-700 mb-3">{fieldDef.label}</h3>
+                {stage1Data[fieldDef.key as keyof Omit<Stage1DataType, 'useDeepResearch'>].length > 0 ? (
+                  <ul className="space-y-2 mb-4">
+                    {stage1Data[fieldDef.key as keyof Omit<Stage1DataType, 'useDeepResearch'>].map((item) => (
+                      <li key={item.id} className="bg-gray-50 p-3 rounded-md border border-gray-200 flex justify-between items-center text-sm">
+                        <span className="font-medium text-gray-800 truncate">{item.title}</span>
+                        <div className="flex space-x-2 ml-4">
+                          <button onClick={() => handleEditInfo(fieldDef.key as keyof Omit<Stage1DataType, 'useDeepResearch'>, item)} className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-md">編集</button>
+                          <button onClick={() => handleDeleteInfo(fieldDef.key as keyof Omit<Stage1DataType, 'useDeepResearch'>, item.id)} className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-800 rounded-md">削除</button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : <p className="text-gray-500 text-sm mb-4">まだ情報がありません。</p>}
+                <form onSubmit={handleAddOrUpdateInfo} className="space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <h4 className="font-semibold text-gray-800">{editingItemId && newInfoType === fieldDef.key ? `情報を編集` : `新しい${fieldDef.label}を追加`}</h4>
+                  <input type="text" placeholder="タイトル" value={newInfoType === fieldDef.key ? newInfoTitle : ''} onChange={(e) => { setNewInfoType(fieldDef.key as keyof Omit<Stage1DataType, 'useDeepResearch'>); setNewInfoTitle(e.target.value); }} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm shadow-sm" required />
+                  <textarea placeholder="ここに内容を入力..." value={newInfoType === fieldDef.key ? newInfoContent : ''} onChange={(e) => { setNewInfoType(fieldDef.key as keyof Omit<Stage1DataType, 'useDeepResearch'>); setNewInfoContent(e.target.value); }} rows={3} className="w-full p-3 border border-gray-300 rounded-lg text-sm resize-y shadow-sm" required></textarea>
+                  <div className="text-right">
+                    <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-md shadow-sm">{editingItemId && newInfoType === fieldDef.key ? '更新' : '追加'}</button>
+                    {editingItemId && newInfoType === fieldDef.key && (<button type="button" onClick={() => { setEditingItemId(null); setNewInfoTitle(''); setNewInfoContent(''); }} className="ml-2 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 text-sm font-semibold rounded-md shadow-sm">キャンセル</button>)}
+                  </div>
+                </form>
+              </div>
+            ))}
+            <div className="mt-8 flex justify-end items-center">
+              <label className="flex items-center mr-4 text-sm text-gray-600 cursor-pointer">
+                <input type="checkbox" checked={useDeepResearch} onChange={(e) => setUseDeepResearch(e.target.checked)} className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
+                <span className="ml-2">Deep Researchを行う (より詳細な分析)</span>
+              </label>
+              <button onClick={handleAnalyzeStage1to2} disabled={aiLoading} className="px-8 py-3 font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed">
+                {aiLoading ? 'AIサマリー作成中...' : 'AIにサマリー作成を依頼 →'}
+              </button>
+            </div>
+            {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
           </div>
         );
       case 2:
-        // ステージ2のUI
         return (
           <div className="bg-white p-8 rounded-lg shadow mb-8">
-            {/* ... ステージ2の完全なJSX ... */}
+            {!stage2Data ? (<p>ステージ1を完了してください。</p>) : (
+              <div>
+                <h2 className="text-xl font-semibold text-gray-800 mb-6">2. AIサマリー</h2>
+                <div className="space-y-6">
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <h3 className="font-semibold text-gray-700 mb-2">商品要素</h3>
+                    <div className="prose prose-sm max-w-none">
+                      <Markdown>{`**特徴:**\n${stage2Data.productElements?.features || 'なし'}`}</Markdown>
+                      <Markdown>{`**メリット:**\n${stage2Data.productElements?.benefits || 'なし'}`}</Markdown>
+                      <Markdown>{`**実績:**\n${stage2Data.productElements?.results || 'なし'}`}</Markdown>
+                      <Markdown>{`**権威性:**\n${stage2Data.productElements?.authority || 'なし'}`}</Markdown>
+                      <Markdown>{`**オファー:**\n${stage2Data.productElements?.offer || 'なし'}`}</Markdown>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-6 text-right">
+                  <button onClick={handleAnalyzeStage2to3} disabled={aiLoading || !stage2Data} className="px-8 py-3 font-semibold text-white bg-green-600 rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed">
+                    {aiLoading ? '戦略仮説を生成中...' : 'AIに戦略仮説の制作を依頼 →'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         );
       case 3:
-        // ステージ3のUI
         return (
           <div className="bg-white p-8 rounded-lg shadow mb-8">
-            {/* ... ステージ3の完全なJSX ... */}
+            {!stage3Data ? (<p>ステージ2を完了してください。</p>) : (
+              <div>
+                <h2 className="text-xl font-semibold text-gray-800 mb-6">3. 戦略仮説 (LPファーストビュー)</h2>
+                <div className="space-y-6">
+                  {/* ... Stage 3 display JSX ... */}
+                </div>
+                <div className="mt-6 text-right">
+                  <button onClick={handleAnalyzeStage3to4} disabled={aiLoading || !stage3Data} className="px-8 py-3 font-semibold text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed">
+                    {aiLoading ? 'アウトプット生成中...' : 'AIに広告アウトプットの制作を依頼 →'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         );
       case 4:
-        // ステージ4のUI
         return (
           <div className="bg-white p-8 rounded-lg shadow mb-8">
             <h2 className="text-xl font-semibold text-gray-800 mb-6">4. アウトプット</h2>
@@ -167,10 +287,6 @@ export default function ProjectStagePage() {
         return <p>無効なステージです。</p>;
     }
   };
-
-  if (loading) {
-    return <div className="flex items-center justify-center min-h-screen"><p>プロジェクトを読み込み中...</p></div>;
-  }
 
   const currentStage = projectData?.currentStage || 1;
   const stageLinks = [

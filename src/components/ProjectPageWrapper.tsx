@@ -12,7 +12,6 @@ import Markdown from 'react-markdown';
 interface ProductElements {
   features: string; benefits: string; results: string; authority: string; offer: string;
 }
-// [FIX] Simplified the Stage 2 data type
 interface AIResponseStage2Data {
   productElements: ProductElements;
 }
@@ -137,7 +136,6 @@ export default function ProjectPageWrapper({ projectId, projectName: initialProj
       const analyzeProductFunc = httpsCallable(functions, 'analyzeProduct');
       const payload: Stage1DataType = { ...stage1Data, useDeepResearch: useDeepResearch };
       const result = await analyzeProductFunc(payload);
-      // [FIX] Updated the expected return type
       const data = result.data as { success: boolean; productElements?: ProductElements; };
 
       if (data.success && data.productElements) {
@@ -215,49 +213,101 @@ export default function ProjectPageWrapper({ projectId, projectName: initialProj
       </header>
       
       <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
-        {/* Stage 1 and its UI are unchanged */}
+        {/* 【FIX】 Restored the Stage 1 UI block */}
         <div className="bg-white p-8 rounded-lg shadow mb-8">
-            {/* ... */}
+          <h2 className="text-xl font-semibold text-gray-800 mb-6">1. 情報基盤 (Foundation)</h2>
+          {stage1FieldDefinitions.map((fieldDef) => (
+            <div key={fieldDef.key} className="mb-6 border-b pb-4 border-gray-100 last:border-b-0 last:pb-0">
+              <h3 className="text-lg font-semibold text-gray-700 mb-3">{fieldDef.label}</h3>
+              {stage1Data[fieldDef.key as keyof Omit<Stage1DataType, 'useDeepResearch'>].length > 0 ? (
+                <ul className="space-y-2 mb-4">
+                  {stage1Data[fieldDef.key as keyof Omit<Stage1DataType, 'useDeepResearch'>].map((item) => (
+                    <li key={item.id} className="bg-gray-50 p-3 rounded-md border border-gray-200 flex justify-between items-center text-sm">
+                      <span className="font-medium text-gray-800 truncate">{item.title}</span>
+                      <div className="flex space-x-2 ml-4">
+                        <button onClick={() => handleEditInfo(fieldDef.key as keyof Omit<Stage1DataType, 'useDeepResearch'>, item)} className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-md">編集</button>
+                        <button onClick={() => handleDeleteInfo(fieldDef.key as keyof Omit<Stage1DataType, 'useDeepResearch'>, item.id)} className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-800 rounded-md">削除</button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="text-gray-500 text-sm mb-4">まだ情報がありません。</p>}
+              <form onSubmit={handleAddOrUpdateInfo} className="space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <h4 className="font-semibold text-gray-800">{editingItemId && newInfoType === fieldDef.key ? `情報を編集` : `新しい${fieldDef.label}を追加`}</h4>
+                <input
+                  type="text"
+                  placeholder="タイトル"
+                  value={newInfoType === fieldDef.key ? newInfoTitle : ''}
+                  onChange={(e) => { setNewInfoType(fieldDef.key as keyof Omit<Stage1DataType, 'useDeepResearch'>); setNewInfoTitle(e.target.value); }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm shadow-sm"
+                  required
+                />
+                <textarea
+                  placeholder="ここに内容を入力..."
+                  value={newInfoType === fieldDef.key ? newInfoContent : ''}
+                  onChange={(e) => { setNewInfoType(fieldDef.key as keyof Omit<Stage1DataType, 'useDeepResearch'>); setNewInfoContent(e.target.value); }}
+                  rows={3}
+                  className="w-full p-3 border border-gray-300 rounded-lg text-sm resize-y shadow-sm"
+                  required
+                ></textarea>
+                <div className="text-right">
+                  <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-md shadow-sm">
+                    {editingItemId && newInfoType === fieldDef.key ? '更新' : '追加'}
+                  </button>
+                  {editingItemId && newInfoType === fieldDef.key && (
+                    <button type="button" onClick={() => { setEditingItemId(null); setNewInfoTitle(''); setNewInfoContent(''); }} className="ml-2 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 text-sm font-semibold rounded-md shadow-sm">
+                      キャンセル
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+          ))}
+          <div className="mt-8 flex justify-end items-center">
+              <label className="flex items-center mr-4 text-sm text-gray-600 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={useDeepResearch} 
+                  onChange={(e) => setUseDeepResearch(e.target.checked)}
+                  className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span className="ml-2">Deep Researchを行う (より詳細な分析)</span>
+              </label>
+            <button onClick={handleAnalyzeStage1to2} disabled={aiLoading} className="px-8 py-3 font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed">
+              {aiLoading ? 'AIサマリー生成中...' : 'AIにサマリー作成を依頼 →'}
+            </button>
+          </div>
+          {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
         </div>
 
         {/* Stage 2 */}
         <div className={`bg-white p-8 rounded-lg shadow mb-8 ${currentStage < 2 ? 'opacity-50 pointer-events-none' : ''}`}>
-          <h2 className="text-xl font-semibold text-gray-800 mb-6">2. AIサマリー & ペルソナ</h2>
-          
-          {/* [FIX] Simplified the Stage 2 display */}
+          <h2 className="text-xl font-semibold text-gray-800 mb-6">2. AIサマリー</h2>
           {stage2Data && (
             <div className="space-y-6">
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <h3 className="font-semibold text-gray-700 mb-2">商品要素</h3>
-                  {/* Using Markdown to render the bullet points from the AI */}
-                  <div className="prose max-w-none text-sm">
-                    <Markdown>{`**特徴:** ${stage2Data.productElements?.features || 'なし'}`}</Markdown>
-                    <Markdown>{`**メリット:** ${stage2Data.productElements?.benefits || 'なし'}`}</Markdown>
-                    <Markdown>{`**実績:** ${stage2Data.productElements?.results || 'なし'}`}</Markdown>
-                    <Markdown>{`**権威性:** ${stage2Data.productElements?.authority || 'なし'}`}</Markdown>
-                    <Markdown>{`**オファー:** ${stage2Data.productElements?.offer || 'なし'}`}</Markdown>
+                  <div className="prose prose-sm max-w-none">
+                    <Markdown>{`**特徴:**\n${stage2Data.productElements?.features || 'なし'}`}</Markdown>
+                    <Markdown>{`**メリット:**\n${stage2Data.productElements?.benefits || 'なし'}`}</Markdown>
+                    <Markdown>{`**実績:**\n${stage2Data.productElements?.results || 'なし'}`}</Markdown>
+                    <Markdown>{`**権威性:**\n${stage2Data.productElements?.authority || 'なし'}`}</Markdown>
+                    <Markdown>{`**オファー:**\n${stage2Data.productElements?.offer || 'なし'}`}</Markdown>
                   </div>
               </div>
             </div>
           )}
-          
           <div className="mt-6 text-right">
-              <button 
-                type="button"
-                onClick={handleAnalyzeStage2to3}
-                disabled={aiLoading || !stage2Data}
-                className="px-8 py-3 font-semibold text-white bg-green-600 rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-              >
-                  {aiLoading ? '戦略仮説生成中...' : 'AIに戦略仮説（LPファーストビュー）の制作を依頼 →'}
-              </button>
+            <button onClick={handleAnalyzeStage2to3} disabled={aiLoading || !stage2Data} className="px-8 py-3 font-semibold text-white bg-green-600 rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed">
+              {aiLoading ? '戦略仮説生成中...' : 'AIに戦略仮説の制作を依頼 →'}
+            </button>
           </div>
         </div>
 
-        {/* Stage 3 and its UI are unchanged */}
+        {/* Stage 3 and 4 UI would follow */}
         <div className={`bg-white p-8 rounded-lg shadow mb-8 ${currentStage < 3 ? 'opacity-50 pointer-events-none' : ''}`}>
-            {/* ... */}
+          {/* ... Stage 3 JSX ... */}
         </div>
-
       </main>
     </div>
   );

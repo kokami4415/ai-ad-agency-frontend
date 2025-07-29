@@ -59,7 +59,7 @@ export default function ProjectStagePage() {
           const data = docSnap.data();
           setProjectData(data);
           const currentDbStage = data.currentStage || 1;
-          if (currentViewStage > currentDbStage) {
+          if (currentViewStage > currentDbStage + 1) { // 2つ以上先のステージには進めない
             router.push(`/dashboard/projects/${projectId}/stage${currentDbStage}`);
           }
           setStage1Data(data.stage1 || { productInfo: [], customerInfo: [], competitorInfo: [], marketInfo: [], brandInfo: [], pastData: [] });
@@ -236,6 +236,7 @@ export default function ProjectStagePage() {
                 </div>
               </div>
             ) : <p className="text-center text-gray-500 py-8">まだ商品要素がありません。「商品要素を抽出」ボタンを押してください。</p>}
+            {error && <p className="text-red-500 text-sm mt-4 text-center">{error}</p>}
           </div>
         );
       case 3:
@@ -253,6 +254,7 @@ export default function ProjectStagePage() {
                 <div className="prose prose-sm max-w-none"><Markdown>{stage3Data.creativeParts}</Markdown></div>
               </div>
             ) : <p className="text-center text-gray-500 py-8">まだクリエイティブパーツがありません。「クリエイティブパーツを生成」ボタンを押してください。</p>}
+            {error && <p className="text-red-500 text-sm mt-4 text-center">{error}</p>}
           </div>
         );
       case 4:
@@ -285,6 +287,7 @@ export default function ProjectStagePage() {
                 </div>
               </div>
             ) : <p className="text-center text-gray-500 py-8">まだ戦略仮説がありません。「戦略仮説を生成」ボタンを押してください。</p>}
+            {error && <p className="text-red-500 text-sm mt-4 text-center">{error}</p>}
           </div>
         );
       case 5:

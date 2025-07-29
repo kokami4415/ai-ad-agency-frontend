@@ -1,9 +1,7 @@
-// src/app/dashboard/projects/[projectId]/stage4/page.tsx
 import StagePageWrapper from '@/components/StagePageWrapper';
 
-interface PageProps { params: Promise<{ projectId: string; }>; }
-export default async function Stage4Page({ params }: PageProps) {
-  const resolvedParams = await params;
-  const { projectId } = resolvedParams;
+interface PageProps { params: { projectId: string; }; }
+export default function Stage4Page({ params }: PageProps) {
+  const { projectId } = params;
   return <StagePageWrapper projectId={projectId} targetStage={4} />;
 }

@@ -41,7 +41,6 @@ export default function ProjectStagePage() {
     productInfo: [], customerInfo: [], competitorInfo: [],
     marketInfo: [], brandInfo: [], pastData: [],
   });
-  const [stage2Data, setStage2Data] = useState<Stage2Data | null>(null);
   const [stage3Data, setStage3Data] = useState<Stage3Data | null>(null);
   const [stage4Data, setStage4Data] = useState<Stage4Data | null>(null);
 
@@ -49,33 +48,42 @@ export default function ProjectStagePage() {
   const [newInfoTitle, setNewInfoTitle] = useState('');
   const [newInfoContent, setNewInfoContent] = useState('');
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [useDeepResearch, setUseDeepResearch] = useState(false);
 
   const [advancedReport, setAdvancedReport] = useState<string | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState('');
 
   useEffect(() => {
-    if (user && projectId) {
-      const projectDocRef = doc(db, "users", user.uid, "projects", projectId);
-      const unsubscribe = onSnapshot(projectDocRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setProjectData(data);
-          const currentDbStage = data.currentStage || 1;
-          if (currentViewStage > currentDbStage + 1 && currentViewStage <= 5) { 
-            router.push(`/dashboard/projects/${projectId}/stage${currentDbStage}`);
+  if (user && projectId) {
+    const projectDocRef = doc(db, "users", user.uid, "projects", projectId);
+    const unsubscribe = onSnapshot(projectDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setProjectData(data);
+        // ... (既存のコードはそのまま) ...
+        setStage4Data(data.stage4 || null);
+
+        // ▼▼▼ ここから下を追加 ▼▼▼
+        setAdvancedReport(data.advancedReport || null);
+        
+        // レポートのステータスに応じてローディング表示を制御
+        if (data.reportStatus === 'processing') {
+          setReportLoading(true);
+          setReportError('');
+        } else {
+          setReportLoading(false);
+          if (data.reportStatus === 'failed') {
+            setReportError(`レポート生成に失敗しました: ${data.reportError || '不明なエラー'}`);
           }
-          setStage1Data(data.stage1 || { productInfo: [], customerInfo: [], competitorInfo: [], marketInfo: [], brandInfo: [], pastData: [] });
-          setStage2Data(data.stage2 || null);
-          setStage3Data(data.stage3 || null);
-          setStage4Data(data.stage4 || null);
-        } else { setError("プロジェクトが見つかりません。"); }
-        setLoading(false);
-      });
-      return () => unsubscribe();
-    }
-  }, [user, projectId, router, currentViewStage]);
+        }
+        // ▲▲▲ ここまで追加 ▲▲▲
+
+      } else { setError("プロジェクトが見つかりません。"); }
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }
+}, [user, projectId, router, currentViewStage]);
 
   const saveStage1DataToFirestore = async (updatedData: Omit<Stage1Data, 'useDeepResearch'>) => {
     if (!user) return;
@@ -100,33 +108,29 @@ export default function ProjectStagePage() {
   };
 
   const handleGenerateAdvancedReport = async () => {
-    if (!projectData?.name) {
-      setReportError("プロジェクト名がありません。");
-      return;
-    }
-    setReportLoading(true);
-    setReportError('');
-    setAdvancedReport(null);
+  if (!projectData?.name || !projectId) {
+    setReportError("プロジェクト情報がありません。");
+    return;
+  }
+  setReportLoading(true);
+  setReportError('');
+  
+  try {
+    // DBを更新して、処理中であることをUIに反映
+    const projectDocRef = doc(db, "users", user!.uid, "projects", projectId);
+    await updateDoc(projectDocRef, { reportStatus: "processing", advancedReport: null });
 
-    try {
-      const researchFunc = httpsCallable(functions, 'advancedProductResearch');
-      const result = await researchFunc({ productName: projectData.name });
-      const data = result.data as { success: boolean; report: string };
-
-      if (data.success) {
-        setAdvancedReport(data.report);
-        // 必要であればDBにレポートを保存
-        // const projectDocRef = doc(db, "users", user!.uid, "projects", projectId);
-        // await updateDoc(projectDocRef, { advancedReport: data.report });
-      } else {
-        throw new Error("レポート生成に失敗しました。");
-      }
-    } catch (err: any) {
-      setReportError(`レポート生成に失敗しました: ${err.message}`);
-    } finally {
-      setReportLoading(false);
-    }
-  };
+    const startResearchFunc = httpsCallable(functions, 'startAdvancedResearch');
+    await startResearchFunc({ projectId, productName: projectData.name });
+    
+    // ここで待たずに、すぐにUIのローディング表示を「処理中」に変える
+    // 実際のローディング状態は onSnapshot が検知する
+    
+  } catch (err: any) {
+    setReportError(`レポート生成リクエストに失敗しました: ${err.message}`);
+    setReportLoading(false);
+  }
+};
 
   const handleEditInfo = (type: Stage1Key, item: Stage1Item) => {
     setNewInfoType(type); setNewInfoTitle(item.title); setNewInfoContent(item.content); setEditingItemId(item.id);
@@ -137,25 +141,6 @@ export default function ProjectStagePage() {
     const updatedStage1Data = { ...stage1Data };
     updatedStage1Data[type] = updatedStage1Data[type].filter(item => item.id !== itemId);
     await saveStage1DataToFirestore(updatedStage1Data);
-  };
-
-  const handleAnalyzeStage1to2 = async () => {
-    if (stage1Data.productInfo.length === 0) { setError("最低1つの商品情報を入力してください。"); return; }
-    setAiLoading(true); setError('');
-    try {
-      const analyzeProductFunc = httpsCallable(functions, 'analyzeProduct');
-      const payload: Stage1Data = { ...stage1Data, useDeepResearch: useDeepResearch };
-      const result = await analyzeProductFunc(payload);
-      const data = result.data as any;
-      if (data.success) {
-        const projectDocRef = doc(db, "users", user!.uid, "projects", projectId);
-        await updateDoc(projectDocRef, {
-          stage2: { productElements: data.productElements },
-          currentStage: 2, updatedAt: new Date(),
-        });
-      } else { throw new Error("AIサマリー生成に失敗しました。"); }
-    } catch (err: any) { setError(`AIサマリー呼び出しに失敗しました: ${err.message}`);
-    } finally { setAiLoading(false); }
   };
 
   const handleAnalyzeStage2to3 = async () => {
@@ -243,34 +228,64 @@ export default function ProjectStagePage() {
           </div>
         );
       case 2:
-        return (
-          <div className="bg-white p-8 rounded-lg shadow mb-8">
-            <div className="mb-6 p-4 border-2 border-dashed rounded-lg flex justify-between items-center">
-              <p className="text-gray-600 text-sm">ステージ1の情報を基に、商品要素を抽出・更新します。</p>
-              <div className="flex items-center">
-                <label className="flex items-center mr-4 text-sm text-gray-600 cursor-pointer">
-                  <input type="checkbox" checked={useDeepResearch} onChange={(e) => setUseDeepResearch(e.target.checked)} className="h-4 w-4 text-indigo-600" />
-                  <span className="ml-2">Deep Research</span>
-                </label>
-                <button onClick={handleAnalyzeStage1to2} disabled={aiLoading} className="px-6 py-2 font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-indigo-300">
-                  {aiLoading ? '生成中...' : '商品要素を抽出'}
-                </button>
-              </div>
-            </div>
-            <h2 className="text-xl font-semibold text-gray-800 mb-6">2. 商品要素抽出</h2>
-            {stage2Data ? (
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <div className="prose prose-sm max-w-none text-gray-800">
-                  <Markdown>{`**特徴:**\n${stage2Data.productElements?.features || 'なし'}`}</Markdown> <hr className="my-2"/>
-                  <Markdown>{`**メリット:**\n${stage2Data.productElements?.benefits || 'なし'}`}</Markdown> <hr className="my-2"/>
-                  <Markdown>{`**実績:**\n${stage2Data.productElements?.results || 'なし'}`}</Markdown> <hr className="my-2"/>
-                  <Markdown>{`**権威性:**\n${stage2Data.productElements?.authority || 'なし'}`}</Markdown> <hr className="my-2"/>
-                  <Markdown>{`**オファー:**\n${stage2Data.productElements?.offer || 'なし'}`}</Markdown>
-                </div>
-              </div>
-            ) : <p className="text-center text-gray-500 py-8">まだ商品要素がありません。「商品要素を抽出」ボタンを押してください。</p>}
+  return (
+    <div className="bg-white p-8 rounded-lg shadow mb-8">
+      {/* --- 高精度 市場分析レポート --- */}
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">高精度 市場分析レポート</h3>
+        <div className="mb-6 p-4 border-2 border-dashed rounded-lg flex justify-between items-center">
+          <p className="text-gray-600 text-sm">Web全体から情報を収集・分析し、詳細なレポートを生成します。<br/>（処理に数分かかる場合があります）</p>
+          <button onClick={handleGenerateAdvancedReport} disabled={reportLoading || aiLoading} className="px-6 py-2 font-semibold text-white bg-teal-600 rounded-md hover:bg-teal-700 disabled:bg-gray-400">
+            {reportLoading ? 'レポートを生成中...' : '高精度レポートを生成'}
+          </button>
+        </div>
+        
+        {reportError && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">{reportError}</div>}
+        
+        {reportLoading && (
+          <div className="text-center py-8">
+            <p className="text-gray-600">レポートを生成しています。数分お待ちください...</p>
+            {/* ここにスピナーなどのアニメーションを追加すると、より分かりやすくなります */}
           </div>
-        );
+        )}
+        
+        {advancedReport && (
+          <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 mt-6">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">分析レポート</h2>
+            <div className="prose prose-sm max-w-none"><Markdown>{advancedReport}</Markdown></div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+      {/* --- 既存の商品要素抽出 --- */}
+      <div className="mb-6 p-4 border-2 border-dashed rounded-lg flex justify-between items-center">
+        <p className="text-gray-600 text-sm">ステージ1の情報を基に、商品要素を抽出・更新します。</p>
+        <div className="flex items-center">
+          <label className="flex items-center mr-4 text-sm text-gray-600 cursor-pointer">
+            <input type="checkbox" checked={useDeepResearch} onChange={(e) => setUseDeepResearch(e.target.checked)} className="h-4 w-4 text-indigo-600" />
+            <span className="ml-2">Deep Research</span>
+          </label>
+          <button onClick={handleAnalyzeStage1to2} disabled={aiLoading || reportLoading} className="px-6 py-2 font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-indigo-300">
+            {aiLoading ? '生成中...' : '商品要素を抽出'}
+          </button>
+        </div>
+      </div>
+      <h2 className="text-xl font-semibold text-gray-800 mb-6">2. 商品要素抽出</h2>
+      {stage2Data ? (
+        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+          <div className="prose prose-sm max-w-none text-gray-800">
+            <Markdown>{`**特徴:**\n${stage2Data.productElements?.features || 'なし'}`}</Markdown> <hr className="my-2"/>
+            <Markdown>{`**メリット:**\n${stage2Data.productElements?.benefits || 'なし'}`}</Markdown> <hr className="my-2"/>
+            <Markdown>{`**実績:**\n${stage2Data.productElements?.results || 'なし'}`}</Markdown> <hr className="my-2"/>
+            <Markdown>{`**権威性:**\n${stage2Data.productElements?.authority || 'なし'}`}</Markdown> <hr className="my-2"/>
+            <Markdown>{`**オファー:**\n${stage2Data.productElements?.offer || 'なし'}`}</Markdown>
+          </div>
+        </div>
+      ) : <p className="text-center text-gray-500 py-8">まだ商品要素がありません。「商品要素を抽出」ボタンを押してください。</p>}
+    </div>
+  );
       case 3:
         return (
           <div className="bg-white p-8 rounded-lg shadow mb-8">

@@ -51,6 +51,10 @@ export default function ProjectStagePage() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [useDeepResearch, setUseDeepResearch] = useState(false);
 
+  const [advancedReport, setAdvancedReport] = useState<string | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState('');
+
   useEffect(() => {
     if (user && projectId) {
       const projectDocRef = doc(db, "users", user.uid, "projects", projectId);
@@ -93,6 +97,35 @@ export default function ProjectStagePage() {
     }
     await saveStage1DataToFirestore(updatedStage1Data);
     setNewInfoTitle(''); setNewInfoContent(''); setEditingItemId(null);
+  };
+
+  const handleGenerateAdvancedReport = async () => {
+    if (!projectData?.name) {
+      setReportError("プロジェクト名がありません。");
+      return;
+    }
+    setReportLoading(true);
+    setReportError('');
+    setAdvancedReport(null);
+
+    try {
+      const researchFunc = httpsCallable(functions, 'advancedProductResearch');
+      const result = await researchFunc({ productName: projectData.name });
+      const data = result.data as { success: boolean; report: string };
+
+      if (data.success) {
+        setAdvancedReport(data.report);
+        // 必要であればDBにレポートを保存
+        // const projectDocRef = doc(db, "users", user!.uid, "projects", projectId);
+        // await updateDoc(projectDocRef, { advancedReport: data.report });
+      } else {
+        throw new Error("レポート生成に失敗しました。");
+      }
+    } catch (err: any) {
+      setReportError(`レポート生成に失敗しました: ${err.message}`);
+    } finally {
+      setReportLoading(false);
+    }
   };
 
   const handleEditInfo = (type: Stage1Key, item: Stage1Item) => {
@@ -290,6 +323,26 @@ export default function ProjectStagePage() {
       case 5:
         return (
           <div className="bg-white p-8 rounded-lg shadow mb-8">
+            <div className="mb-8 pb-8 border-b">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">高精度 市場分析レポート</h3>
+              <div className="mb-6 p-4 border-2 border-dashed rounded-lg flex justify-between items-center">
+                <p className="text-gray-600 text-sm">Web全体から情報を収集・分析し、詳細なレポートを生成します。<br/>（処理に数分かかる場合があります）</p>
+                <button onClick={handleGenerateAdvancedReport} disabled={reportLoading || aiLoading} className="px-6 py-2 font-semibold text-white bg-teal-600 rounded-md hover:bg-teal-700 disabled:bg-gray-400">
+                  {reportLoading ? 'レポート生成中...' : '高精度レポートを生成'}
+                </button>
+              </div>
+              
+              {reportError && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">{reportError}</div>}
+              
+              {reportLoading && <div className="text-center py-8 text-gray-600">レポートを生成しています。数分お待ちください...</div>}
+              
+              {advancedReport && (
+                <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                  <div className="prose prose-sm max-w-none"><Markdown>{advancedReport}</Markdown></div>
+                </div>
+              )}
+            </div>
+
             <div className="mb-6 p-4 border-2 border-dashed rounded-lg flex justify-between items-center">
               <p className="text-gray-600 text-sm">戦略仮説を基に、具体的な広告クリエイティブを生成します。</p>
               <button onClick={handleAnalyzeStage4to5} disabled={aiLoading} className="px-6 py-2 font-semibold text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:bg-gray-300">
